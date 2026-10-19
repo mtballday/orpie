@@ -148,6 +148,35 @@ let has_units uu = uu <> Units.empty_unit
 
 type display_mode_t = | Line | Fullscreen
 
+(* insert commas as thousands separators into the leading integer part of a
+ * formatted number, e.g. "-1234567.5e3" -> "-1,234,567.5e3" *)
+let add_commas (s : string) =
+   let len = String.length s in
+   let start = if len > 0 && (s.[0] = '-' || s.[0] = '+') then 1 else 0 in
+   let stop = ref start in
+   while !stop < len && s.[!stop] >= '0' && s.[!stop] <= '9' do
+      incr stop
+   done;
+   if !stop - start <= 3 then
+      s
+   else begin
+      let buf = Buffer.create (len + (!stop - start) / 3) in
+      Buffer.add_string buf (String.sub s 0 start);
+      for i = start to pred !stop do
+         if i > start && (!stop - i) mod 3 = 0 then
+            Buffer.add_char buf ',';
+         Buffer.add_char buf s.[i]
+      done;
+      Buffer.add_string buf (String.sub s !stop (len - !stop));
+      Buffer.contents buf
+   end
+
+(* the line-oriented display may use commas as thousands separators.  The
+ * fullscreen display never does, since it is also used as editor input
+ * (where commas separate complex components and matrix elements). *)
+let line_commas s =
+   if !Rcfile.display_commas then add_commas s else s
+
 type angle_mode   = | Rad | Deg
 type base_mode    = | Bin | Oct | Hex | Dec
 type complex_mode = | Rect | Polar
@@ -397,12 +426,16 @@ class rpc_stack conserve_memory_in =
                   end
                end
             |StackFloatUnit (ff, uu, fu_str) ->
-               begin match fu_str.fu with
-               |None ->
-                  self#create_float_unit_string ff uu fu_str
-               |Some ss ->
-                  ss
-               end
+               if disp_mode = Fullscreen && !Rcfile.display_commas then
+                  (* the cached string contains commas *)
+                  self#float_unit_string false ff uu
+               else
+                  begin match fu_str.fu with
+                  |None ->
+                     self#create_float_unit_string ff uu fu_str
+                  |Some ss ->
+                     ss
+                  end
             |StackComplexUnit (cc, uu, cc_str) ->
                let lookup_cmpx_str record =
                   begin match record with
@@ -624,7 +657,7 @@ class rpc_stack conserve_memory_in =
             end
          |Dec ->
             let s = string_of_big_int_base_gen ii 10 in
-            let line = "# " ^ s ^ "`d"
+            let line = "# " ^ (line_commas s) ^ "`d"
             and fs   = "#" ^ s ^ "`d" in
             if conserve_memory then () else begin
                ii_str.i_dec_line <- Some line;
@@ -637,14 +670,18 @@ class rpc_stack conserve_memory_in =
 
 
       (* generate a string representation for a floating-point value with a unit *)
+      method private float_unit_string commas ff uu =
+         let num = sprintf "%.15g" ff in
+         let num = if commas then add_commas num else num in
+         if uu <> Units.empty_unit then
+            num ^ "_" ^ (Units.string_of_units uu)
+         else
+            num
+
+
+      (* generate a string representation for the line-oriented display *)
       method private create_float_unit_string ff uu fu_str =
-         let s = 
-            if uu <> Units.empty_unit then
-               sprintf "%.15g_%s" ff
-               (Units.string_of_units uu)
-            else
-               sprintf "%.15g" ff
-         in
+         let s = self#float_unit_string !Rcfile.display_commas ff uu in
          if conserve_memory then () 
          else fu_str.fu <- Some s;
          s
@@ -966,6 +1003,18 @@ class rpc_stack conserve_memory_in =
          match disp_mode with
          |Line       -> line
          |Fullscreen -> fs
+
+
+      (* discard all cached string representations, so that they will be
+       * regenerated (e.g. after the comma display setting changes) *)
+      method invalidate_strings () =
+         for i = 0 to pred len do
+            let new_el = stack_data_of_orpie_data
+               (orpie_data_of_stack_data stack.(i)) in
+            stack.(i) <- new_el;
+            if conserve_memory then ()
+            else Stack.push new_el render_stack
+         done
 
 
       method launch_fill_in_thread () =

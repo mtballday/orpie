@@ -100,12 +100,21 @@ class rpc_calc conserve_memory =
          |Dec -> self#mode_hex ()
          |Hex -> self#mode_bin ()
 
+      method toggle_commas () =
+         Rcfile.display_commas := not !Rcfile.display_commas;
+         stack#invalidate_strings ();
+         backup_stack#invalidate_strings ()
+
       method get_state () =
          (modes, variables, stack#get_state ())
 
       method set_state (m, v, s_op) =
          begin match s_op with
-         |Some st -> stack#set_state st
+         |Some st ->
+            stack#set_state st;
+            (* the saved strings may have been rendered with a different
+             * comma setting *)
+            stack#invalidate_strings ()
          |None    -> ()
          end;
          modes     <- m;

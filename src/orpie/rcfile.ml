@@ -58,6 +58,8 @@ let editor = ref "vi";;
 let hide_help = ref false;;
 (* Whether or not to conserve memory in favor of faster display *)
 let conserve_memory = ref false;;
+(* Whether or not to display commas as thousands separators *)
+let display_commas = ref false;;
 (* Autobinding keys *)
 let autobind_keys_list : (int * string * operation_t option * int) list ref = ref [];;
 let autobind_keys = ref (Array.make 1 (0, "", None, 0));;
@@ -538,6 +540,7 @@ let operation_of_string command_str =
    |"command_rand"                  -> (Command Rand)
    |"command_edit_input"            -> (Command EditInput)
    |"command_cycle_help"            -> (Command CycleHelp)
+   |"command_toggle_commas"         -> (Command ToggleCommas)
    |"browse_end"                    -> (Browse EndBrowse)
    |"browse_scroll_left"            -> (Browse ScrollLeft)
    |"browse_scroll_right"           -> (Browse ScrollRight)
@@ -791,6 +794,25 @@ let parse_line line_stream =
             end
          | [< >] ->
             config_failwith ("Expected \"=\" after \"set conserve_memory\"")
+         end
+      | [< 'Ident "display_commas" >] ->
+         begin match line_stream with parser
+         | [< 'Ident "=" >] ->
+            begin match line_stream with parser
+            | [< 'String setting >] ->
+               if setting = "true" then
+                  display_commas := true
+               else if setting = "false" then
+                  display_commas := false
+               else
+                  config_failwith ("Expected a boolean argument after " ^
+                  "\"set display_commas = \"")
+            | [< >] ->
+               config_failwith ("Expected a boolean argument after " ^
+               "\"set display_commas = \"")
+            end
+         | [< >] ->
+            config_failwith ("Expected \"=\" after \"set display_commas\"")
          end
       | [< >] ->
          config_failwith ("Unmatched variable name after \"set\"")

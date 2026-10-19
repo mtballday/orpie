@@ -9,6 +9,8 @@ set editor="vi"
 set hide_help="false"
 # whether or not to conserve memory in favor of faster rendering
 set conserve_memory="false"
+# whether or not to display commas as thousands separators
+set display_commas="false"
 
 
 # keys for "edit" operations, which affect the data that
@@ -184,6 +186,7 @@ abbrev "dec"               command_dec
 abbrev "hex"               command_hex
 abbrev "view"              command_view
 abbrev "refresh"           command_refresh
+abbrev "com"               command_toggle_commas
 abbrev "pi"                command_enter_pi
 abbrev "rand"              command_rand
 abbrev "edit"              command_edit_input

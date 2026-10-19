@@ -157,10 +157,16 @@ let handle_resize (iface : interface_state_t) =
 (* OBTAINING AN OBJECT FROM THE ENTRY BUFFER                       *)
 (*******************************************************************)
 
+(* remove digit grouping commas from an entry buffer *)
+let strip_commas s =
+   String.concat "" (String.split_on_char ',' s)
+
+
 (* parse the entry buffers to obtain a stack object *)
 let get_entry_from_buffer (iface : interface_state_t) =
    (* get a float from strings representing the mantissa and exponent *)
    let get_float_el mantissa exponent =
+      let mantissa = strip_commas mantissa in
       if String.length mantissa > 0 then
          if String.length exponent > 0 then
             if exponent = "-" || exponent = "+" then
@@ -193,7 +199,7 @@ let get_entry_from_buffer (iface : interface_state_t) =
       begin
          try
             let ival = Big_int_str.big_int_of_string_base 
-            iface.int_entry_buffer base in
+            (strip_commas iface.int_entry_buffer) base in
             RpcInt ival
          with Big_int_str.Big_int_string_failure error_msg ->
             raise (Invalid_argument error_msg)
@@ -495,6 +501,27 @@ let handle_separator (iface : interface_state_t) =
          (iface.is_entering_imag <- true;
          iface.is_entering_exponent <- false;
          draw_update_entry iface)
+   |FloatEntry ->
+      (* digit grouping commas within the integer part of a real number *)
+      let buffer = iface.gen_buffer.(0) in
+      let mantissa = buffer.re_mantissa in
+      let len = String.length mantissa in
+      if not iface.is_entering_exponent && len > 0 &&
+         mantissa.[len - 1] >= '0' && mantissa.[len - 1] <= '9' &&
+         not (String.contains mantissa '.') then
+         (buffer.re_mantissa <- mantissa ^ ",";
+         draw_update_entry iface)
+      else
+         ()
+   |IntEntry ->
+      (* digit grouping commas within an integer *)
+      let len = String.length iface.int_entry_buffer in
+      if not iface.is_entering_base && len > 0 &&
+         iface.int_entry_buffer.[len - 1] <> ',' then
+         (iface.int_entry_buffer <- iface.int_entry_buffer ^ ",";
+         draw_update_entry iface)
+      else
+         ()
    |_ ->
       ()
 
@@ -843,7 +870,7 @@ let handle_digit (iface : interface_state_t) key =
                   ()
             else
                ()
-         else if String.length mantissa_buffer < 17 then
+         else if String.length (strip_commas mantissa_buffer) < 17 then
             let digits =
                if has_decimal then "0123456789"
                else "0123456789."
@@ -1599,6 +1626,9 @@ let process_command (iface : interface_state_t) cc =
       handle_edit_input iface
    |CycleHelp ->
       handle_cycle_help iface
+   |ToggleCommas ->
+      handle_command_call iface iface.calc#toggle_commas;
+      draw_update_stack iface
    end
 
 
@@ -1968,6 +1998,8 @@ let handle_keypress_intedit key (iface : interface_state_t) =
          handle_minus iface
       |SciNotBase ->
          handle_scientific_notation iface
+      |Separator ->
+         handle_separator iface
       |_ -> raise Not_handled
       end
    with Not_found | Not_handled ->

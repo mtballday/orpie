@@ -156,7 +156,9 @@ hit \texttt{1<enter>2<enter>+} in order to add 1 and 2.
 %@% END-IF %@%
 To enter a real number, just type the desired digits and hit enter.  The space
 bar will begin entry of a scientific notation exponent.  The '\texttt{n}' key is used
-for negation.  Here are some examples:
+for negation.  Commas may be typed between digits of the integer part to group
+thousands (e.g. \texttt{1,234,567.5}); they are ignored when the number is
+entered.  Here are some examples:
 %@% IF LATEX %@%
 \begin{center}
    \begin{tabular}[t]{|r|r|}
@@ -778,6 +780,7 @@ have been implemented using the abbreviation syntax:
       \texttt{oct} & set base display mode to octal \\
       \texttt{dec} & set base display mode to decimal \\
       \texttt{hex} & set base display mode to hexidecimal \\
+      \texttt{com} & toggle display of commas as thousands separators \\
       \texttt{view} & view last stack element in a fullscreen editor \\
       \texttt{edit} & create a new stack element using an external editor \\
 %@% IF LATEX %@%
@@ -1460,6 +1463,13 @@ CONFIGURATION VARIABLES section.
       Orpie caches multiple string representations of all stack elements.  Very large
       integers in particular require significant computation for string representation,
       so caching these strings can make display updates much faster.)
+   \item \texttt{display\_commas} \\
+      Set this variable to \texttt{"true"} to display real numbers and decimal
+      integers on the stack with commas as thousands separators (e.g.
+      \texttt{1,234,567.5}), or leave it on the default of \texttt{"false"}.  This
+      setting can be toggled while Orpie is running with
+      \texttt{command\_toggle\_commas}.  Commas are not used in the fullscreen
+      display or for complex numbers and matrices.
 \end{itemize}
 
 %@% IF LATEX %@%
@@ -1756,6 +1766,8 @@ they do not take an argument.  Many calculator interface settings are implemente
       Toggle the angle mode between degrees and radians.
    \item \texttt{command\_toggle\_complex\_mode} \\
       Toggle the complex display mode between rectangular and polar.
+   \item \texttt{command\_toggle\_commas} \\
+      Toggle the display of commas as thousands separators.
    \item \texttt{command\_undo} \\
       Undo the last calculator operation.
    \item \texttt{command\_view} \\

@@ -392,7 +392,8 @@ let generate_abbrev_help () =
       (get_abbr (Command SetDec))     ^ "  " ^ 
       (get_abbr (Command SetHex))     ^ "  " ^ 
       (get_abbr (Command SetRect))    ^ "  " ^ 
-      (get_abbr (Command SetPolar))
+      (get_abbr (Command SetPolar))   ^ "  " ^ 
+      (get_abbr (Command ToggleCommas))
    in
    let modes_str_wrap = trunc_list 
    (Utility.wordwrap_nspace modes_str 34 2) 2 in
