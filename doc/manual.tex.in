@@ -780,6 +780,7 @@ have been implemented using the abbreviation syntax:
       \texttt{oct} & set base display mode to octal \\
       \texttt{dec} & set base display mode to decimal \\
       \texttt{hex} & set base display mode to hexidecimal \\
+      \texttt{std} & display real numbers in standard (full precision) format \\
       \texttt{com} & toggle display of commas as thousands separators \\
       \texttt{view} & view last stack element in a fullscreen editor \\
       \texttt{edit} & create a new stack element using an external editor \\
@@ -802,6 +803,36 @@ have been implemented using the abbreviation syntax:
 %@% ELSE %@%
 \end{Table}
 %@% END-IF %@%
+
+Real numbers may be displayed in one of four formats, which work as on HP
+calculators.  Only one format is active at a time; selecting a format replaces
+the previous one.  The \texttt{fix}, \texttt{sci} and \texttt{eng}
+abbreviations take the number of digits (an integer from 0 to 11) from the stack,
+so \texttt{3<enter>'eng<enter>} selects engineering notation with three digits
+after the first significant digit.
+%@% IF LATEX %@%
+\begin{center}
+   \begin{tabular}[t]{|l|l|l|}
+%@% ELSE %@%
+\begin{Table}{3}
+%@% END-IF %@%
+      \hline
+      Abbreviation & Format & 12345.678 is displayed as \\
+      \hline
+      \texttt{std} & standard, up to 15 significant digits & \texttt{12345.678} \\
+      \texttt{fix} & \emph{n} decimal places & \texttt{12345.68} (\texttt{n} = 2) \\
+      \texttt{sci} & scientific, \emph{n} decimal places & \texttt{1.23e4} (\texttt{n} = 2) \\
+      \texttt{eng} & engineering, exponent a multiple of 3 & \texttt{12.35e3} (\texttt{n} = 3) \\
+      \hline
+%@% IF LATEX %@%
+   \end{tabular}
+\end{center}
+%@% ELSE %@%
+\end{Table}
+%@% END-IF %@%
+In \texttt{fix} format, values that are too large or too small to display are
+shown in scientific notation.  The display format applies to the stack display
+only; fullscreen viewing and editing always use full precision.
 
 \subsection{Browsing the Stack}
 Orpie offers a \emph{stack browsing mode} to assist in viewing and manipulating
@@ -1470,6 +1501,10 @@ CONFIGURATION VARIABLES section.
       setting can be toggled while Orpie is running with
       \texttt{command\_toggle\_commas}.  Commas are not used in the fullscreen
       display or for complex numbers and matrices.
+   \item \texttt{display\_format} \\
+      The initial display format for real numbers: \texttt{"std"} (the default),
+      \texttt{"fix \emph{n}"}, \texttt{"sci \emph{n}"} or \texttt{"eng \emph{n}"},
+      where \emph{n} is a number of digits from 0 to 11.
 \end{itemize}
 
 %@% IF LATEX %@%
@@ -1671,6 +1706,15 @@ to a real number, and as such the arithmetic will no longer be exact.
       1xM matrix as a result.
    \item \texttt{function\_trace} \\
       Compute the trace of a square matrix.
+   \item \texttt{function\_fix} \\
+      Display real numbers in fixed-point format, with the number of decimal
+      places taken from the last stack element.
+   \item \texttt{function\_sci} \\
+      Display real numbers in scientific notation, with the number of mantissa
+      decimal places taken from the last stack element.
+   \item \texttt{function\_eng} \\
+      Display real numbers in engineering notation, with the number of mantissa
+      digits after the first significant digit taken from the last stack element.
    \item \texttt{function\_transpose} \\
       Compute the matrix transpose of the last stack element.
    \item \texttt{function\_unit\_value} \\
@@ -1768,6 +1812,8 @@ they do not take an argument.  Many calculator interface settings are implemente
       Toggle the complex display mode between rectangular and polar.
    \item \texttt{command\_toggle\_commas} \\
       Toggle the display of commas as thousands separators.
+   \item \texttt{command\_std} \\
+      Display real numbers in the standard (full precision) format.
    \item \texttt{command\_undo} \\
       Undo the last calculator operation.
    \item \texttt{command\_view} \\

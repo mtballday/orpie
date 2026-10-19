@@ -35,6 +35,15 @@ type abbrev_help_display_t = {functions : string list;
 
 (* display the stack, where the bottom line of the display
  * corresponds to stack level 'stack_bottom_row' *)
+(* short description of the real number display format *)
+let display_format_string () =
+   match !Rcfile.display_format with
+   |Rcfile.Std   -> "STD"
+   |Rcfile.Fix n -> sprintf "FIX %d" n
+   |Rcfile.Sci n -> sprintf "SCI %d" n
+   |Rcfile.Eng n -> sprintf "ENG %d" n
+
+
 let draw_stack (iface : interface_state_t) =
    let print_numbered_line l_num =
       let num_len = 
@@ -82,6 +91,13 @@ let draw_stack (iface : interface_state_t) =
          |Rect -> "REC"
          |Polar -> "POL" in
          assert (mvwaddstr iface.scr.stack_win 0 34 complex_str);
+         if iface.scr.sw_cols >= 52 then begin
+            wattron iface.scr.stack_win WA.bold;
+            assert (mvwaddstr iface.scr.stack_win 0 40 "display:");
+            wattroff iface.scr.stack_win WA.bold;
+            assert (mvwaddstr iface.scr.stack_win 0 49 (display_format_string ()))
+         end else
+            ();
          assert (mvwaddstr iface.scr.stack_win 1 0 (String.make (iface.scr.sw_cols) '-'));
          iface.scr.sw_lines - 2
       end
@@ -393,10 +409,14 @@ let generate_abbrev_help () =
       (get_abbr (Command SetHex))     ^ "  " ^ 
       (get_abbr (Command SetRect))    ^ "  " ^ 
       (get_abbr (Command SetPolar))   ^ "  " ^ 
+      (get_abbr (Command SetStd))     ^ "  " ^ 
+      (get_abbr (Function SetFix))    ^ "  " ^ 
+      (get_abbr (Function SetSci))    ^ "  " ^ 
+      (get_abbr (Function SetEng))    ^ "  " ^ 
       (get_abbr (Command ToggleCommas))
    in
    let modes_str_wrap = trunc_list 
-   (Utility.wordwrap_nspace modes_str 34 2) 2 in
+   (Utility.wordwrap_nspace modes_str 34 2) 3 in
    let misc_str = 
       (get_abbr (Command EnterPi)) ^ "  " ^ 
       (get_abbr (Command Undo))    ^ "  " ^ 
@@ -724,6 +744,10 @@ let draw_help (iface : interface_state_t) =
       |Rect -> "REC"
       |Polar -> "POL" in
       assert (mvwaddstr win 3 34 complex_str);
+      wattron win WA.bold;
+      assert (mvwaddstr win 4 2 "display:");
+      wattroff win WA.bold;
+      assert (mvwaddstr win 4 11 (display_format_string ()));
       let try_find op =
          try Rcfile.key_of_operation op
          with Not_found -> "(N/A)"

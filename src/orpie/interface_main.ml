@@ -1542,6 +1542,15 @@ let process_function (iface : interface_state_t) ff =
       handle_function_call iface iface.calc#unit_value
    |Trace ->
       handle_function_call iface iface.calc#trace
+   |SetFix ->
+      handle_function_call iface iface.calc#mode_fix;
+      draw_help iface
+   |SetSci ->
+      handle_function_call iface iface.calc#mode_sci;
+      draw_help iface
+   |SetEng ->
+      handle_function_call iface iface.calc#mode_eng;
+      draw_help iface
    end
 
 
@@ -1628,6 +1637,10 @@ let process_command (iface : interface_state_t) cc =
       handle_cycle_help iface
    |ToggleCommas ->
       handle_command_call iface iface.calc#toggle_commas;
+      draw_update_stack iface
+   |SetStd ->
+      handle_command_call iface iface.calc#mode_std;
+      draw_help iface;
       draw_update_stack iface
    end
 

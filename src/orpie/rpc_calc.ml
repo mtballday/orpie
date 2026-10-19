@@ -100,10 +100,55 @@ class rpc_calc conserve_memory =
          |Dec -> self#mode_hex ()
          |Hex -> self#mode_bin ()
 
-      method toggle_commas () =
-         Rcfile.display_commas := not !Rcfile.display_commas;
+      method private invalidate_strings () =
          stack#invalidate_strings ();
          backup_stack#invalidate_strings ()
+
+      method toggle_commas () =
+         Rcfile.display_commas := not !Rcfile.display_commas;
+         self#invalidate_strings ()
+
+      (* display formats for real numbers.  Only one format is active at a
+       * time, so selecting one replaces any other (e.g. SCI cancels ENG). *)
+      method private set_display_format fmt =
+         Rcfile.display_format := fmt;
+         self#invalidate_strings ()
+
+      method mode_std () =
+         self#set_display_format Rcfile.Std
+
+      method mode_fix () = self#check_args 1 "fix" (self#internal_display_digits
+         "fix" (fun n -> Rcfile.Fix n))
+
+      method mode_sci () = self#check_args 1 "sci" (self#internal_display_digits
+         "sci" (fun n -> Rcfile.Sci n))
+
+      method mode_eng () = self#check_args 1 "eng" (self#internal_display_digits
+         "eng" (fun n -> Rcfile.Eng n))
+
+      (* pop the number of display digits from the stack, as with the HP
+       * "n FIX", "n SCI" and "n ENG" commands *)
+      method private internal_display_digits fn_str make_format () =
+         self#evaln 1;
+         let gen_el = stack#pop () in
+         let digits =
+            match gen_el with
+            |RpcInt ii when is_int_big_int ii ->
+               Some (int_of_big_int ii)
+            |RpcFloatUnit (ff, uu) when uu = Units.empty_unit &&
+               ff = Float.round ff && abs_float ff <= 1e6 ->
+               Some (int_of_float ff)
+            |_ ->
+               None
+         in
+         match digits with
+         |Some n when n >= 0 && n <= Rcfile.max_display_digits ->
+            self#set_display_format (make_format n)
+         |_ ->
+            stack#push gen_el;
+            raise (Invalid_argument (Printf.sprintf
+               "%s requires an integer from 0 to %d" fn_str
+               Rcfile.max_display_digits))
 
       method get_state () =
          (modes, variables, stack#get_state ())

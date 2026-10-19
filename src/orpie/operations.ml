@@ -34,7 +34,7 @@ type function_operation_t = | Add | Sub | Mult | Div | Neg | Inv
                             | Total | Mean | Sumsq | Var |VarBias
                             | Stdev | StdevBias | Min | Max 
                             | Utpn | StandardizeUnits | ConvertUnits
-                            | UnitValue | Trace;;
+                            | UnitValue | Trace | SetFix | SetSci | SetEng;;
 
 type command_operation_t  = | Drop | Clear | Swap | Dup | Undo
                             | BeginBrowse | BeginAbbrev | BeginVar | Quit
@@ -43,7 +43,7 @@ type command_operation_t  = | Drop | Clear | Swap | Dup | Undo
                             | ToggleAngleMode | ToggleComplexMode | CycleBase
                             | View | About | Refresh | EnterPi | Rand
                             | EditInput | CycleHelp | BeginConst
-                            | ToggleCommas;;
+                            | ToggleCommas | SetStd;;
 
 type edit_operation_t     = | Digit | Enter | Backspace | Minus | SciNotBase 
                             | BeginInteger | BeginComplex | BeginMatrix

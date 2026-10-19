@@ -60,6 +60,12 @@ let hide_help = ref false;;
 let conserve_memory = ref false;;
 (* Whether or not to display commas as thousands separators *)
 let display_commas = ref false;;
+(* Display format for real numbers, as on HP calculators.  The argument
+ * is the number of digits: decimal places for Fix, mantissa decimal places
+ * for Sci and Eng.  The formats are mutually exclusive. *)
+type display_format_t = | Std | Fix of int | Sci of int | Eng of int;;
+let display_format = ref Std;;
+let max_display_digits = 11;;
 (* Autobinding keys *)
 let autobind_keys_list : (int * string * operation_t option * int) list ref = ref [];;
 let autobind_keys = ref (Array.make 1 (0, "", None, 0));;
@@ -502,6 +508,9 @@ let operation_of_string command_str =
    |"function_convert_units"        -> (Function ConvertUnits)
    |"function_unit_value"           -> (Function UnitValue)
    |"function_trace"                -> (Function Trace)
+   |"function_fix"                  -> (Function SetFix)
+   |"function_sci"                  -> (Function SetSci)
+   |"function_eng"                  -> (Function SetEng)
    |"edit_begin_integer"            -> (Edit BeginInteger)
    |"edit_complex"                  -> (Edit BeginComplex)
    |"edit_matrix"                   -> (Edit BeginMatrix)
@@ -541,6 +550,7 @@ let operation_of_string command_str =
    |"command_edit_input"            -> (Command EditInput)
    |"command_cycle_help"            -> (Command CycleHelp)
    |"command_toggle_commas"         -> (Command ToggleCommas)
+   |"command_std"                   -> (Command SetStd)
    |"browse_end"                    -> (Browse EndBrowse)
    |"browse_scroll_left"            -> (Browse ScrollLeft)
    |"browse_scroll_right"           -> (Browse ScrollRight)
@@ -813,6 +823,36 @@ let parse_line line_stream =
             end
          | [< >] ->
             config_failwith ("Expected \"=\" after \"set display_commas\"")
+         end
+      | [< 'Ident "display_format" >] ->
+         let format_err () =
+            config_failwith ("Expected \"std\", \"fix N\", \"sci N\" or " ^
+            "\"eng N\" (0 <= N <= 11) after \"set display_format = \"")
+         in
+         begin match line_stream with parser
+         | [< 'Ident "=" >] ->
+            begin match line_stream with parser
+            | [< 'String setting >] ->
+               let words = List.filter (fun w -> w <> "")
+                  (String.split_on_char ' ' (String.lowercase_ascii setting)) in
+               let digits n =
+                  match int_of_string_opt n with
+                  |Some d when d >= 0 && d <= max_display_digits -> d
+                  |_ -> format_err ()
+               in
+               display_format :=
+                  begin match words with
+                  |["std"]      -> Std
+                  |["fix"; n]   -> Fix (digits n)
+                  |["sci"; n]   -> Sci (digits n)
+                  |["eng"; n]   -> Eng (digits n)
+                  |_            -> format_err ()
+                  end
+            | [< >] ->
+               format_err ()
+            end
+         | [< >] ->
+            config_failwith ("Expected \"=\" after \"set display_format\"")
          end
       | [< >] ->
          config_failwith ("Unmatched variable name after \"set\"")

@@ -11,6 +11,8 @@ set hide_help="false"
 set conserve_memory="false"
 # whether or not to display commas as thousands separators
 set display_commas="false"
+# display format for real numbers: "std", "fix N", "sci N" or "eng N"
+set display_format="std"
 
 
 # keys for "edit" operations, which affect the data that
@@ -170,6 +172,9 @@ abbrev "ustand"            function_standardize_units
 abbrev "uconvert"          function_convert_units
 abbrev "uvalue"            function_unit_value
 abbrev "trace"             function_trace
+abbrev "fix"               function_fix
+abbrev "sci"               function_sci
+abbrev "eng"               function_eng
 abbrev "drop"              command_drop
 abbrev "clear"             command_clear
 abbrev "swap"              command_swap
@@ -187,6 +192,7 @@ abbrev "hex"               command_hex
 abbrev "view"              command_view
 abbrev "refresh"           command_refresh
 abbrev "com"               command_toggle_commas
+abbrev "std"               command_std
 abbrev "pi"                command_enter_pi
 abbrev "rand"              command_rand
 abbrev "edit"              command_edit_input

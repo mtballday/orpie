@@ -177,6 +177,76 @@ let add_commas (s : string) =
 let line_commas s =
    if !Rcfile.display_commas then add_commas s else s
 
+
+(* split an OCaml "%e" string such as "-1.234e+05" into "-1.234" and 5 *)
+let split_exponent (s : string) =
+   let i = String.index s 'e' in
+   (String.sub s 0 i,
+    int_of_string (String.sub s (succ i) (String.length s - i - 1)))
+
+(* scientific notation with 'digits' decimal places in the mantissa *)
+let sci_string digits ff =
+   let mantissa, ex = split_exponent (sprintf "%.*e" digits ff) in
+   sprintf "%se%d" mantissa ex
+
+(* engineering notation: like scientific notation with digits+1 significant
+ * digits, but with the exponent a multiple of three, as on HP calculators *)
+let eng_string digits ff =
+   let mantissa, ex = split_exponent (sprintf "%.*e" digits ff) in
+   let sign, mantissa =
+      if mantissa.[0] = '-' then
+         ("-", String.sub mantissa 1 (String.length mantissa - 1))
+      else
+         ("", mantissa)
+   in
+   let sig_digits = String.concat "" (String.split_on_char '.' mantissa) in
+   (* number of places to shift the decimal point right *)
+   let shift = ((ex mod 3) + 3) mod 3 in
+   let sig_digits =
+      let len = String.length sig_digits in
+      if len < shift + 1 then sig_digits ^ String.make (shift + 1 - len) '0'
+      else sig_digits
+   in
+   let int_part  = String.sub sig_digits 0 (shift + 1)
+   and frac_part = String.sub sig_digits (shift + 1)
+      (String.length sig_digits - shift - 1) in
+   if frac_part = "" then
+      sprintf "%s%se%d" sign int_part (ex - shift)
+   else
+      sprintf "%s%s.%se%d" sign int_part frac_part (ex - shift)
+
+(* fixed-point notation with 'digits' decimal places.  As on HP calculators,
+ * values that are too large or too small to display this way are shown in
+ * scientific notation. *)
+let fix_string digits ff =
+   let aa = abs_float ff in
+   if aa >= 1e12 || (aa > 0.0 && aa < 0.5 *. 10.0 ** (float_of_int (-digits))) then
+      sci_string digits ff
+   else
+      sprintf "%.*f" digits ff
+
+(* full-precision representation of a real number *)
+let std_real ff = sprintf "%.15g" ff
+
+(* representation of a real number for the line-oriented display, using the
+ * current display format.  Infinities and NaNs are left alone. *)
+let line_real ff =
+   match classify_float ff with
+   |FP_infinite | FP_nan ->
+      std_real ff
+   |_ ->
+      begin match !Rcfile.display_format with
+      |Rcfile.Std     -> std_real ff
+      |Rcfile.Fix n   -> fix_string n ff
+      |Rcfile.Sci n   -> sci_string n ff
+      |Rcfile.Eng n   -> eng_string n ff
+      end
+
+(* real and complex values share one cached string between the line-oriented
+ * and fullscreen displays; this is false when those displays differ *)
+let line_matches_fullscreen () =
+   not !Rcfile.display_commas && !Rcfile.display_format = Rcfile.Std
+
 type angle_mode   = | Rad | Deg
 type base_mode    = | Bin | Oct | Hex | Dec
 type complex_mode = | Rect | Polar
@@ -426,8 +496,8 @@ class rpc_stack conserve_memory_in =
                   end
                end
             |StackFloatUnit (ff, uu, fu_str) ->
-               if disp_mode = Fullscreen && !Rcfile.display_commas then
-                  (* the cached string contains commas *)
+               if disp_mode = Fullscreen && not (line_matches_fullscreen ()) then
+                  (* the cached string is formatted for the line display *)
                   self#float_unit_string false ff uu
                else
                   begin match fu_str.fu with
@@ -445,6 +515,10 @@ class rpc_stack conserve_memory_in =
                      ss
                   end
                in
+               if disp_mode = Fullscreen && not (line_matches_fullscreen ()) then
+                  (* the cached string is formatted for the line display *)
+                  self#cmpx_unit_string std_real calc_modes cc uu
+               else
                begin match calc_modes.complex with
                |Rect -> 
                   lookup_cmpx_str cc_str.c_rect
@@ -670,9 +744,8 @@ class rpc_stack conserve_memory_in =
 
 
       (* generate a string representation for a floating-point value with a unit *)
-      method private float_unit_string commas ff uu =
-         let num = sprintf "%.15g" ff in
-         let num = if commas then add_commas num else num in
+      method private float_unit_string line ff uu =
+         let num = if line then line_commas (line_real ff) else std_real ff in
          if uu <> Units.empty_unit then
             num ^ "_" ^ (Units.string_of_units uu)
          else
@@ -681,7 +754,7 @@ class rpc_stack conserve_memory_in =
 
       (* generate a string representation for the line-oriented display *)
       method private create_float_unit_string ff uu fu_str =
-         let s = self#float_unit_string !Rcfile.display_commas ff uu in
+         let s = self#float_unit_string true ff uu in
          if conserve_memory then () 
          else fu_str.fu <- Some s;
          s
@@ -689,7 +762,7 @@ class rpc_stack conserve_memory_in =
 
       (* generate a string representation for a complex value, taking
        * into account the representation mode and angle mode of the calc *)
-      method private create_cmpx_unit_string calc_modes cc uu cc_str =
+      method private cmpx_unit_string fmt calc_modes cc uu =
          let append_units ss =
             if uu <> Units.empty_unit then
                ss ^ "_" ^ (Units.string_of_units uu)
@@ -698,28 +771,35 @@ class rpc_stack conserve_memory_in =
          in
          match calc_modes.complex with
          |Rect ->
-            let s = append_units 
-            (sprintf "(%.15g, %.15g)" cc.Complex.re cc.Complex.im) in
-            if conserve_memory then () 
-            else cc_str.c_rect <- Some s;
-            s
+            append_units 
+            (sprintf "(%s, %s)" (fmt cc.Complex.re) (fmt cc.Complex.im))
          |Polar ->
             let r = sqrt (cc.Complex.re *. cc.Complex.re +.
                cc.Complex.im *. cc.Complex.im)
             and theta = atan2 cc.Complex.im cc.Complex.re in
             begin match calc_modes.angle with
             |Rad ->
-               let s = append_units (sprintf "(%.15g <%.15g)" r theta) in
-               if conserve_memory then () 
-               else cc_str.c_pol_rad <- Some s;
-               s
+               append_units (sprintf "(%s <%s)" (fmt r) (fmt theta))
             |Deg ->
-               let s = append_units 
-               (sprintf "(%.15g <%.15g)" r (180.0 /. pi *. theta)) in
-               if conserve_memory then () 
-               else cc_str.c_pol_deg <- Some s;
-               s
+               append_units 
+               (sprintf "(%s <%s)" (fmt r) (fmt (180.0 /. pi *. theta)))
             end
+
+
+      (* generate the cached string representation for the line display *)
+      method private create_cmpx_unit_string calc_modes cc uu cc_str =
+         let s = self#cmpx_unit_string line_real calc_modes cc uu in
+         if conserve_memory then ()
+         else begin match calc_modes.complex with
+         |Rect ->
+            cc_str.c_rect <- Some s
+         |Polar ->
+            begin match calc_modes.angle with
+            |Rad -> cc_str.c_pol_rad <- Some s
+            |Deg -> cc_str.c_pol_deg <- Some s
+            end
+         end;
+         s
 
 
       (* generate a string representation for a floating-point matrix,
@@ -741,9 +821,9 @@ class rpc_stack conserve_memory_in =
                for n = 0 to rows - 1 do
                   line := !line ^ "[ ";
                   for m = 0 to cols - 2 do
-                     line := !line ^ (sprintf "%.15g, " fm.{n, m})
+                     line := !line ^ (sprintf "%s, " (line_real fm.{n, m}))
                   done;
-                  line := !line ^ (sprintf "%.15g ]" fm.{n, cols-1})
+                  line := !line ^ (sprintf "%s ]" (line_real fm.{n, cols-1}))
                done;
                line := !line ^ "]";
                !line
@@ -817,8 +897,9 @@ class rpc_stack conserve_memory_in =
                   for m = 0 to cols - 2 do
                      match calc_modes.complex with
                      |Rect ->
-                        line := !line ^ (sprintf "(%.15g, %.15g), " 
-                           cm.{n, m}.Complex.re cm.{n, m}.Complex.im)
+                        line := !line ^ (sprintf "(%s, %s), " 
+                           (line_real cm.{n, m}.Complex.re)
+                           (line_real cm.{n, m}.Complex.im))
                      |Polar ->
                         let rr = cm.{n, m}.Complex.re
                         and ii = cm.{n, m}.Complex.im in
@@ -826,17 +907,18 @@ class rpc_stack conserve_memory_in =
                         and theta = atan2 ii rr in
                         begin match calc_modes.angle with
                         |Rad ->
-                           line := !line ^ (sprintf "(%.15g <%.15g), " 
-                           r theta)
+                           line := !line ^ (sprintf "(%s <%s), " 
+                           (line_real r) (line_real theta))
                         |Deg ->
-                           line := !line ^ (sprintf "(%.15g <%.15g), " 
-                           r (180.0 /. pi *. theta))
+                           line := !line ^ (sprintf "(%s <%s), " 
+                           (line_real r) (line_real (180.0 /. pi *. theta)))
                         end
                   done;
                   match calc_modes.complex with
                   |Rect ->
-                     line := !line ^ (sprintf "(%.15g, %.15g) ]" 
-                        cm.{n, cols-1}.Complex.re cm.{n, cols-1}.Complex.im)
+                     line := !line ^ (sprintf "(%s, %s) ]" 
+                        (line_real cm.{n, cols-1}.Complex.re)
+                        (line_real cm.{n, cols-1}.Complex.im))
                   |Polar ->
                      let rr = cm.{n, cols-1}.Complex.re
                      and ii = cm.{n, cols-1}.Complex.im in
@@ -844,11 +926,11 @@ class rpc_stack conserve_memory_in =
                      and theta = atan2 ii rr in
                      begin match calc_modes.angle with
                      |Rad ->
-                        line := !line ^ (sprintf "(%.15g <%.15g) ]" 
-                        r theta)
+                        line := !line ^ (sprintf "(%s <%s) ]" 
+                        (line_real r) (line_real theta))
                      |Deg ->
-                        line := !line ^ (sprintf "(%.15g <%.15g) ]" 
-                        r (180.0 /. pi *. theta))
+                        line := !line ^ (sprintf "(%s <%s) ]" 
+                        (line_real r) (line_real (180.0 /. pi *. theta)))
                      end
                done;
                line := !line ^ "]";
