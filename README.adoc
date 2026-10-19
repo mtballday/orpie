@@ -1,6 +1,8 @@
 Orpie README
 ============
 
+**This is a fork of Oprie where I've added eng and fix mode display, and the ability to display commas in big numbers.**
+
 Orpie is a Curses-based RPN calculator.
 
 == Installation
